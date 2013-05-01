@@ -1,4 +1,5 @@
 #! /bin/ruby
 
 require 'socket'
-TCPSocket.new(SERVER_NAME,62085)
+s = TCPSocket.new(SERVER_NAME,62085)
+s.close
