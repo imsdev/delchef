@@ -90,6 +90,7 @@ int main(int argc, char **argv){
         syslog(LOG_ERR, "Error listening");
         exit(1);
     }
+    syslog(LOG_INFO, "Waiting for connections");
     addr_size = sizeof(cli_addr);
     char name[100];
     char ip[INET_ADDRSTRLEN]; 
@@ -100,6 +101,7 @@ int main(int argc, char **argv){
         }
         inet_ntop(AF_INET, &(cli_addr.sin_addr),ip,INET_ADDRSTRLEN);
         close(new_fd);
+        syslog(LOG_INFO, "Received connection from %s", ip);
         getnameinfo((struct sockaddr*)&cli_addr, sizeof(cli_addr), name, sizeof(name), NULL, 0, 0);
         char comm[128];
         memset(comm,0,sizeof(comm));
