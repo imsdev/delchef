@@ -44,7 +44,7 @@ int main(int argc, char **argv){
 
     struct sockaddr_in cli_addr;
     socklen_t addr_size;
-    struct addrinfo hints, *res;
+    struct addrinfo hints, *res, *p;
     int sockfd, new_fd;
 
     // !! don't forget your error checking for these calls !!
@@ -60,13 +60,25 @@ int main(int argc, char **argv){
         syslog(LOG_ERR, "getaddrinfo() error");
         exit(1);
     }
+    for (p = res; p != NULL; p->ai_next){
+        if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1){
+            syslog(LOG_ERR, "Error creating socket");
+            continue;
+        }
+        int yes = 1;
+        if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1){
+            syslog(LOG_ERR, "Error settings socket options");
+            exit(1);
+        }
+        if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1){
+            close(sockfd);
+            syslog(LOG_ERR, "Error binding socket");
+            continue;
+        }
 
-    if ((sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) == -1){
-        syslog(LOG_ERR, "Error creating socket");
-        exit(1);
+        break;    
     }
-
-    if (bind(sockfd, res->ai_addr, res->ai_addrlen) == -1){
+    if (p == NULL){
         close(sockfd);
         syslog(LOG_ERR, "Error binding socket");
         exit(1);
@@ -95,7 +107,7 @@ int main(int argc, char **argv){
         strcat(comm,name);
         strcat(comm, " -y");
         system(comm);
-        syslog(LOG_INFO, "Deleted: %s\n", name);
+        syslog(LOG_INFO, "Deleted: %s", name);
         sleep(1);
     }
 
