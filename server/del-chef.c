@@ -10,6 +10,7 @@
 #include <netdb.h>
 #include <fcntl.h>
 #include <syslog.h>
+#include <signal.h>
 
 #define BACKLOG 10 // make bigger if this causes problems when deploying to labs
 #define PORT "62085"
