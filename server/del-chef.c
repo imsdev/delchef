@@ -84,7 +84,7 @@ int main(int argc, char **argv){
     }
 
     addr_size = sizeof(cli_addr);
-    char name[256];
+    char name[100];
     char ip[INET_ADDRSTRLEN]; 
     while(1){
         if (new_fd = accept(sockfd, (struct sockaddr *)&cli_addr, &addr_size) == -1){
