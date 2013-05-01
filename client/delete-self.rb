@@ -1,5 +1,7 @@
 #! /bin/ruby
 
 require 'socket'
-s = TCPSocket.new(SERVER_NAME,62085)
+# SERVER_NAME is the name of the server
+# and PORT is the port number specified in del-chef.c
+s = TCPSocket.new(SERVER_NAME,PORT)
 s.close
