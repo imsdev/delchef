@@ -60,7 +60,7 @@ int main(int argc, char **argv){
         syslog(LOG_ERR, "getaddrinfo() error");
         exit(1);
     }
-    for (p = res; p != NULL; p->ai_next){
+    for (p = res; p != NULL; p = p->ai_next){
         if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1){
             syslog(LOG_ERR, "Error creating socket");
             continue;
