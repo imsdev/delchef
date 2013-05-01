@@ -39,10 +39,14 @@ void daemonize()
 }
 
 int main(int argc, char **argv){
-	daemonize();
-	FILE *log_file;
-	log_file = fopen(LOG_FILE, "w");
-	struct sockaddr_in cli_addr;
+    daemonize();
+    FILE *log_file;
+    log_file = fopen(LOG_FILE, "w");
+    if (log_file == NULL){
+        fprintf(stderr, "Log file could not be opened!\n");
+        exit(1);
+    }
+    struct sockaddr_in cli_addr;
     socklen_t addr_size;
     struct addrinfo hints, *res;
     int sockfd, new_fd;
@@ -55,22 +59,42 @@ int main(int argc, char **argv){
     hints.ai_family = AF_INET;  // use IPv4
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;     // fill in my IP for me
-	
-	getaddrinfo(NULL, PORT, &hints, &res); // port 3000, chosen for no particular reason
-	sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-	bind(sockfd, res->ai_addr, res->ai_addrlen);
-	listen(sockfd, BACKLOG); // allow 5 backlog connections, this service should be used pretty irregularly
-	freeaddrinfo(res);
-	addr_size = sizeof(cli_addr);
-	char name[256];
-	char ip[INET_ADDRSTRLEN]; 
-	while(1){
-		printf("Waiting for a connection...\n");
-		new_fd = accept(sockfd, (struct sockaddr *)&cli_addr, &addr_size);
-		inet_ntop(AF_INET, &(cli_addr.sin_addr),ip,INET_ADDRSTRLEN);
-		close(new_fd);
-		printf("%s connected...\n", ip);
-		
+    
+    if (getaddrinfo(NULL, PORT, &hints, &res) != 0){
+        perror("getaddrinfo error");
+        exit(1);
+    }
+
+    if ((sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) == -1){
+        perror("Error creating socket");
+        exit(1);
+    }
+
+    if (bind(sockfd, res->ai_addr, res->ai_addrlen) == -1){
+        close(sockfd);
+        perror("Error binding socket");
+        exit(1);
+    }
+    freeaddrinfo(res); // free memory now that it is no longer in use
+    // allow 5 backlog connections, this service should be used pretty irregularly
+    if (listen(sockfd, BACKLOG) == -1){
+        close(sockfd);
+        perror("Error listening");
+        exit(1);
+    }
+
+    addr_size = sizeof(cli_addr);
+    char name[256];
+    char ip[INET_ADDRSTRLEN]; 
+    while(1){
+        if (new_fd = accept(sockfd, (struct sockaddr *)&cli_addr, &addr_size) == -1){
+            perror("Error accepting connection");
+            continue;
+        }
+        inet_ntop(AF_INET, &(cli_addr.sin_addr),ip,INET_ADDRSTRLEN);
+        close(new_fd);
+        printf("%s connected...\n", ip);
+        
         getnameinfo((struct sockaddr*)&cli_addr, sizeof(cli_addr), name, sizeof(name), NULL, 0, 0);
         char comm[128];
         memset(comm,0,sizeof(comm));
@@ -78,9 +102,9 @@ int main(int argc, char **argv){
         strcat(comm,name);
         strcat(comm, " -y");
         system(comm);
-		fprintf(log_file, "Deleted: %s\n", name);
-		fflush(log_file);
-		sleep(1);
-	}
+        fprintf(log_file, "Deleted: %s\n", name);
+        fflush(log_file);
+        sleep(1);
+    }
 
 }
