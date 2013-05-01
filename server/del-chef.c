@@ -93,8 +93,6 @@ int main(int argc, char **argv){
         }
         inet_ntop(AF_INET, &(cli_addr.sin_addr),ip,INET_ADDRSTRLEN);
         close(new_fd);
-        printf("%s connected...\n", ip);
-        
         getnameinfo((struct sockaddr*)&cli_addr, sizeof(cli_addr), name, sizeof(name), NULL, 0, 0);
         char comm[128];
         memset(comm,0,sizeof(comm));
