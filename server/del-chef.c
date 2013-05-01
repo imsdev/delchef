@@ -15,7 +15,7 @@
 #define LOG_FILE "/var/log/delete-connecting-clients.log"
 // This program assumes that knife is properly configured
 // and has administrator access.  This will delete any
-// client who connects through reverse DNS.
+// client who connects through DNS.
 
 void daemonize()
 {
