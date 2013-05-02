@@ -16,12 +16,12 @@
 #define PORT "62085"
 #define LOG_FILE "/var/log/delchef/delchef.log"
 
-#define log(level, fmt, ...)              \
-    logfile = fopen(LOG_FILE, "a");       \
-    fprintf(logfile, fmt, __VA_ARGS__);   \
+#define log(level, message)         \
+    logfile = fopen(LOG_FILE, "a"); \
+    fprintf(logfile, message);            \
     fprintf(logfile, "\n");               \
     fclose(logfile);                      \
-    syslog(level, fmt, __VA_ARGS__);
+    syslog(level, message);
 
 
 
@@ -64,22 +64,22 @@ int main(int argc, char **argv){
     hints.ai_flags = AI_PASSIVE;     // fill in my IP for me
     
     if (getaddrinfo(NULL, PORT, &hints, &res) != 0){
-        log(LOG_ERR, "%s", "getaddrinfo() error");
+        log(LOG_ERR, "getaddrinfo() error");
         exit(1);
     }
     for (p = res; p != NULL; p = p->ai_next){
         if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1){
-            log(LOG_ERR, "%s", "Error creating socket");
+            log(LOG_ERR, "Error creating socket");
             continue;
         }
         int yes = 1;
         if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1){
-            log(LOG_ERR, "%s", "Error settings socket options");
+            log(LOG_ERR, "Error settings socket options");
             exit(1);
         }
         if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1){
             close(sockfd);
-            log(LOG_ERR, "%s", "Error binding socket");
+            log(LOG_ERR, "Error binding socket");
             continue;
         }
 
@@ -87,41 +87,41 @@ int main(int argc, char **argv){
     }
     if (p == NULL){
         close(sockfd);
-        log(LOG_ERR, "%s", "Error binding socket");
+        log(LOG_ERR, "Error binding socket");
         exit(1);
     }
     freeaddrinfo(res); // free memory now that it is no longer in use
     // allow 5 backlog connections, this service should be used pretty irregularly
     if (listen(sockfd, BACKLOG) == -1){
         close(sockfd);
-        log(LOG_ERR, "%s", "Error listening");
+        log(LOG_ERR, "Error listening");
         exit(1);
     }
-    log(LOG_INFO, "%s", "Waiting for connections");
+    log(LOG_INFO, "Waiting for connections");
     addr_size = sizeof(cli_addr);
     char name[100];
     char ip[INET_ADDRSTRLEN]; 
     while(1){
         if (new_fd = accept(sockfd, (struct sockaddr *)&cli_addr, &addr_size) == -1){
-            log(LOG_ERR, "%s", "Error accepting connection");
+            log(LOG_ERR, "Error accepting connection");
             continue;
         }
         inet_ntop(AF_INET, &(cli_addr.sin_addr),ip,INET_ADDRSTRLEN);
         close(new_fd);
-        log(LOG_INFO, "Received connection from %s", ip);
+        log(LOG_INFO, ("Received connection from %s", ip));
         getnameinfo((struct sockaddr*)&cli_addr, sizeof(cli_addr), name, sizeof(name), NULL, 0, 0);
         pid_t pid;
         pid = fork();
         if (pid == 0){ // child process
             execl("/usr/bin/knife", "/usr/bin/knife", "client", "delete", name, "-y", NULL);
-            log(LOG_ERR, "%s", "Error executing execl()");
+            log(LOG_ERR, "Error executing execl()");
             exit(1);
         }
         else if (pid < 0){
-            log(LOG_ERR, "%s", "Error forking a new process");
+            log(LOG_ERR, "Error forking a new process");
             exit(1);
         }
-        log(LOG_INFO, "Deleted: %s", name);
+        log(LOG_INFO, ("Deleted: %s", name));
         sleep(1);
     }
 
