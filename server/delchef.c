@@ -14,6 +14,17 @@
 
 #define BACKLOG 10 // make bigger if this causes problems when deploying to labs
 #define PORT "62085"
+#define LOG_FILE "/var/log/delchef/delchef.log"
+
+#define log(level, message)         \
+    logfile = fopen(LOG_FILE, "a"); \
+    fprintf(logfile, message);            \
+    fprintf(logfile, "\n");               \
+    fclose(logfile);                      \
+    syslog(level, message);
+
+
+
 // This program assumes that knife is properly configured
 // and has administrator access.  This will delete any
 // client who connects through DNS.
@@ -41,38 +52,34 @@ void daemonize()
 
 int main(int argc, char **argv){
     daemonize();
-
+    FILE *logfile = NULL;
     struct sockaddr_in cli_addr;
     socklen_t addr_size;
     struct addrinfo hints, *res, *p;
     int sockfd, new_fd;
-
-    // !! don't forget your error checking for these calls !!
-
     // first, load up address structs with getaddrinfo():
-
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;  // use IPv4
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;     // fill in my IP for me
     
     if (getaddrinfo(NULL, PORT, &hints, &res) != 0){
-        syslog(LOG_ERR, "getaddrinfo() error");
+        log(LOG_ERR, "getaddrinfo() error");
         exit(1);
     }
     for (p = res; p != NULL; p = p->ai_next){
         if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1){
-            syslog(LOG_ERR, "Error creating socket");
+            log(LOG_ERR, "Error creating socket");
             continue;
         }
         int yes = 1;
         if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1){
-            syslog(LOG_ERR, "Error settings socket options");
+            log(LOG_ERR, "Error settings socket options");
             exit(1);
         }
         if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1){
             close(sockfd);
-            syslog(LOG_ERR, "Error binding socket");
+            log(LOG_ERR, "Error binding socket");
             continue;
         }
 
@@ -80,28 +87,28 @@ int main(int argc, char **argv){
     }
     if (p == NULL){
         close(sockfd);
-        syslog(LOG_ERR, "Error binding socket");
+        log(LOG_ERR, "Error binding socket");
         exit(1);
     }
     freeaddrinfo(res); // free memory now that it is no longer in use
     // allow 5 backlog connections, this service should be used pretty irregularly
     if (listen(sockfd, BACKLOG) == -1){
         close(sockfd);
-        syslog(LOG_ERR, "Error listening");
+        log(LOG_ERR, "Error listening");
         exit(1);
     }
-    syslog(LOG_INFO, "Waiting for connections");
+    log(LOG_INFO, "Waiting for connections");
     addr_size = sizeof(cli_addr);
     char name[100];
     char ip[INET_ADDRSTRLEN]; 
     while(1){
         if (new_fd = accept(sockfd, (struct sockaddr *)&cli_addr, &addr_size) == -1){
-            syslog(LOG_ERR, "Error accepting connection");
+            log(LOG_ERR, "Error accepting connection");
             continue;
         }
         inet_ntop(AF_INET, &(cli_addr.sin_addr),ip,INET_ADDRSTRLEN);
         close(new_fd);
-        syslog(LOG_INFO, "Received connection from %s", ip);
+        log(LOG_INFO, ("Received connection from %s", ip));
         getnameinfo((struct sockaddr*)&cli_addr, sizeof(cli_addr), name, sizeof(name), NULL, 0, 0);
         char comm[128];
         memset(comm,0,sizeof(comm));
@@ -109,7 +116,7 @@ int main(int argc, char **argv){
         strcat(comm,name);
         strcat(comm, " -y");
         system(comm);
-        syslog(LOG_INFO, "Deleted: %s", name);
+        log(LOG_INFO, ("Deleted: %s", name));
         sleep(1);
     }
 

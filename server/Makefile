@@ -2,7 +2,11 @@ CC=gcc
 
 all:
 	$(CC) -o /usr/bin/delchef delchef.c
+	userdel delchef
 	useradd --no-create-home --user-group --inactive -1 --system --shell "/sbin/nologin" delchef
+	if ! [ -d /var/log/delchef]; then \
+	  mkdir /var/log/delchef; \
+	fi
 	mkdir /var/log/delchef
 	touch /var/log/delchef/delchef.log
 	chmod -R 0664 /var/log/delchef
