@@ -1,10 +1,10 @@
 # del-chef upstart script
-description "Starts and stops the del-chef server"
+description "Starts and stops the delchef server"
 version "1.0"
 author "Max Dietz"
 
-# tell upstart we're creating a daemon
-# upstart manages PID creation for you.
-expect fork
+start on networking
 
-exec /usr/bin/del-chef
+respawn
+
+exec /usr/bin/delchef
