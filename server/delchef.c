@@ -11,47 +11,29 @@
 #include <fcntl.h>
 #include <syslog.h>
 #include <signal.h>
+#include <time.h>
 
 #define BACKLOG 10 // make bigger if this causes problems when deploying to labs
 #define PORT "62085"
 #define LOG_FILE "/var/log/delchef/delchef.log"
+#define CLIENT_NAME "delchef"
+#define KEY_LOCATION "/etc/chef/delchef.pem"
 
 #define log(level, fmt, ...)              \
     logfile = fopen(LOG_FILE, "a");       \
+    time_t ltime = time(NULL);            \
+    struct tm* ctime = localtime(&ltime);\
+    fprintf(logfile, "[%02d/%02d/%04d - %02d:%02d:%02d]: ", ctime->tm_mday, ctime->tm_mon, ctime->tm_year + 1900, ctime->tm_hour, ctime->tm_min, ctime->tm_sec); \
     fprintf(logfile, fmt, __VA_ARGS__);   \
     fprintf(logfile, "\n");               \
     fclose(logfile);                      \
     syslog(level, fmt, __VA_ARGS__);
 
-
-
 // This program assumes that knife is properly configured
 // and has administrator access.  This will delete any
 // client who connects through DNS.
 
-void daemonize()
-{
-    int i;
- 
-    if(getppid()==1) return; /* already a daemon */
-    i=fork();
-    if (i<0) exit(1); /* fork error */
-    if (i>0) exit(0); /* parent exits */
- 
-    /* child (daemon) continues */
-    setsid(); /* obtain a new process group */
-    for (i=getdtablesize();i>=0;--i) close(i); /* close all descriptors */
-    i=open("/dev/null",O_RDWR); dup(i); dup(i); /* handle standard I/O */
- 
-    /* first instance continues */
-    signal(SIGCHLD,SIG_IGN); /* ignore child */
-    signal(SIGTSTP,SIG_IGN); /* ignore tty signals */
-    signal(SIGTTOU,SIG_IGN);
-    signal(SIGTTIN,SIG_IGN);
-}
-
 int main(int argc, char **argv){
-    daemonize();
     FILE *logfile = NULL;
     struct sockaddr_in cli_addr;
     socklen_t addr_size;
@@ -59,9 +41,9 @@ int main(int argc, char **argv){
     int sockfd, new_fd;
     // first, load up address structs with getaddrinfo():
     memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;  // use IPv4
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_PASSIVE;     // fill in my IP for me
+    hints.ai_family = AF_INET;       // use IPv4
+    hints.ai_socktype = SOCK_STREAM; // using TCP
+    hints.ai_flags = AI_PASSIVE;     // fill in my IP for me, should be 0.0.0.0
     
     if (getaddrinfo(NULL, PORT, &hints, &res) != 0){
         log(LOG_ERR, "%s", "getaddrinfo() error");
@@ -91,7 +73,7 @@ int main(int argc, char **argv){
         exit(1);
     }
     freeaddrinfo(res); // free memory now that it is no longer in use
-    // allow 5 backlog connections, this service should be used pretty irregularly
+    
     if (listen(sockfd, BACKLOG) == -1){
         close(sockfd);
         log(LOG_ERR, "%s", "Error listening");
@@ -108,12 +90,19 @@ int main(int argc, char **argv){
         }
         inet_ntop(AF_INET, &(cli_addr.sin_addr),ip,INET_ADDRSTRLEN);
         close(new_fd);
-        log(LOG_INFO, "Received connection from %s", ip);
         getnameinfo((struct sockaddr*)&cli_addr, sizeof(cli_addr), name, sizeof(name), NULL, 0, 0);
+        log(LOG_INFO, "Received connection from %s [%s]", ip, name);
         pid_t pid;
         pid = fork();
         if (pid == 0){ // child process
-            execl("/usr/bin/knife", "/usr/bin/knife", "client", "delete", name, "-y", NULL);
+            int out = open(LOG_FILE, O_CREAT | O_RDWR | O_APPEND);
+            if (out == -1){
+                log(LOG_ERR, "%s", "Error opening log for child");
+            }
+            dup2(out, STDOUT_FILENO);
+            dup2(out, STDERR_FILENO);
+            close(out);
+            execl("/usr/bin/knife", "/usr/bin/knife", "client", "delete", name, "-y", "-u", CLIENT_NAME, "-k", KEY_LOCATION, NULL);
             log(LOG_ERR, "%s", "Error executing execl()");
             exit(1);
         }
@@ -121,7 +110,6 @@ int main(int argc, char **argv){
             log(LOG_ERR, "%s", "Error forking a new process");
             exit(1);
         }
-        log(LOG_INFO, "Deleted: %s", name);
         sleep(1);
     }
 
